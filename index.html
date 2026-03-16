@@ -1,0 +1,316 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S/4HANA 共同科目與 FI/CO 完整模擬測驗</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft JhengHei", sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e40af 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; color: #1e293b; }
+        .container { background: white; border-radius: 15px; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4); max-width: 850px; width: 100%; padding: 40px; }
+        .setup-view { text-align: center; }
+        .setup-view h1 { color: #1e40af; margin-bottom: 10px; }
+        .setup-view p { color: #64748b; margin-bottom: 30px; }
+        .mode-options { display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; }
+        .header { text-align: center; margin-bottom: 25px; border-bottom: 2px solid #f1f5f9; padding-bottom: 15px; }
+        .title { font-size: 22px; color: #1e40af; font-weight: bold; }
+        .progress-bar-bg { width: 100%; height: 8px; background: #e2e8f0; border-radius: 5px; overflow: hidden; margin-top: 10px; }
+        .progress-bar { height: 100%; background: #3b82f6; width: 0%; transition: width 0.3s; }
+        .question-text { font-size: 18px; font-weight: 600; line-height: 1.6; margin-bottom: 20px; min-height: 60px; white-space: pre-wrap; }
+        .options { display: grid; gap: 12px; }
+        .option { padding: 14px; border: 2px solid #e2e8f0; border-radius: 10px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; }
+        .option:hover:not(.disabled) { border-color: #3b82f6; background: #eff6ff; }
+        .option.correct { background: #dcfce7; border-color: #22c55e; }
+        .option.wrong { background: #fef2f2; border-color: #ef4444; }
+        .option.disabled { cursor: default; }
+        .option-label { font-weight: bold; margin-right: 12px; color: #3b82f6; }
+        .hint-box { margin-top: 20px; padding: 15px; background: #fffbeb; border-left: 5px solid #f59e0b; border-radius: 5px; font-size: 14px; }
+        .controls { display: flex; justify-content: space-between; margin-top: 30px; }
+        .btn { padding: 12px 28px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 16px; }
+        .btn-primary { background: #1e40af; color: white; }
+        .btn-primary:hover { background: #1e3a8a; }
+        .btn-outline { background: white; border: 2px solid #1e40af; color: #1e40af; }
+        .btn-outline:hover { background: #f0f4ff; }
+        .btn-hint { background: #f8fafc; border: 1px solid #cbd5e1; }
+        .hidden { display: none !important; }
+        #resultView { text-align: center; }
+        .wrong-answers-section { margin-top: 40px; text-align: left; border-top: 2px dashed #e2e8f0; padding-top: 20px; max-height: 500px; overflow-y: auto; }
+        .wrong-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 15px; margin-bottom: 15px; }
+        .wrong-q { font-weight: bold; color: #1e293b; margin-bottom: 8px; display: block; }
+        .answer-diff { font-size: 14px; margin-bottom: 8px; }
+        .your-ans { color: #ef4444; margin-right: 15px; }
+        .correct-ans { color: #22c55e; font-weight: bold; }
+        .wrong-hint { font-size: 13px; color: #64748b; background: #fffbeb; padding: 8px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="setupView" class="setup-view">
+        <h1>S/4HANA 財務與共同科目認證模擬</h1>
+        <p>題庫已更新！包含共同科目與 FI/CO 模組共 100 題：</p>
+        <div class="mode-options">
+            <button class="btn btn-outline" onclick="startQuiz(40)">⚡ 強化練習 (40題)</button>
+            <button class="btn btn-outline" onclick="startQuiz(70)">🎯 進階挑戰 (70題)</button>
+            <button class="btn btn-primary" onclick="startQuiz(100)">🏆 完整考科 (100題)</button>
+        </div>
+    </div>
+
+    <div id="quizView" class="hidden">
+        <div class="header">
+            <div class="title" id="quizTitle">隨機測驗模式</div>
+            <div style="margin-top:10px;">
+                <span id="progressText">第 1 題 / 共 -- 題</span>
+                <div class="progress-bar-bg"><div class="progress-bar" id="progressBar"></div></div>
+            </div>
+        </div>
+        <div class="question-section">
+            <div id="questionText" class="question-text"></div>
+            <div id="optionsContainer" class="options"></div>
+        </div>
+        <div id="hintBox" class="hint-box hidden">
+            <strong>💡 參考答案說明：</strong> <span id="hintContent"></span>
+        </div>
+        <div class="controls">
+            <button class="btn btn-hint" onclick="toggleHint()">顯示答案</button>
+            <button class="btn btn-primary" id="nextBtn" onclick="handleNext()">下一題</button>
+        </div>
+    </div>
+
+    <div id="resultView" class="hidden">
+        <h1 style="color: #1e40af;">測驗完成！</h1>
+        <div style="font-size: 64px; font-weight: bold; margin: 10px 0; color: #1e40af;" id="finalScore">0%</div>
+        <p id="resultDetail" style="font-size: 18px; color: #64748b; margin-bottom: 20px;"></p>
+        <div id="wrongAnswersList" class="wrong-answers-section">
+            <h3 style="margin-bottom: 15px; color: #1e293b;">❌ 錯題回顧</h3>
+            <div id="wrongItemsContainer"></div>
+        </div>
+        <button class="btn btn-primary" style="margin-top: 30px;" onclick="location.reload()">回首頁</button>
+    </div>
+</div>
+
+<script>
+    const allQuestions = [
+        // 原有題庫 (76題)
+        {q: "多個公司代碼的財報，可藉由那一種組織架構合併？ 1 Profit Center 利潤中心 2 Company 公司 3 Segment (段) 4 Work Center 工作中心", o: ["1,2,3", "1,3,4", "1,4", "2,3,4"], a: 0, h: "根據題庫：合併可藉由利潤中心、公司、段來達成。"},
+        {q: "對財務模組而言，下列那一個組織架構是屬於可填可不填？", o: ["Company (公司代碼)", "Business Area (業務範圍)", "Chart of Account (會計科目表)", "Client ( 集團)"], a: 1, h: "Business Area 為選填項目。"},
+        {q: "一個公司代碼(company code) 可指派(assign)至幾個信用控制範圍(credit control area)？", o: ["1", "2", "3", "4"], a: 0, h: "一個公司代碼僅能指派至一個信用控制範圍。"},
+        {q: "一張傳票(Document) 何時過帳(posting)，由那個日期決定？", o: ["過帳日期(posting date)", "文件日期(document date)", "兌換日期(Translate date)", "建立日期( Entry date)"], a: 0, h: "過帳日期決定其進入的會計期間。"},
+        {q: "請問財會組( FI ) 提供的對象是", o: ["外部使用者", "內部使用者", "內部與外部使用者", "由企業自行決定"], a: 0, h: "FI 主要是為了外部財務報表需求。"},
+        {q: "在 財會模組 ( FI )中那些科目是提供給 管會模組( CO) 供後續處理之用？", o: ["成本(costs)", "成本(costs) 與 收入(revenues) 科目", "負債 ( liabilities )", "資產( assets )"], a: 1, h: "CO 處理損益相關科目（成本與收入）。"},
+        {q: "分類帳冊( General Ledger )可以達到多套帳的效果，下列敘述何者正確？", o: ["一個公司代碼 ( Company Code )的分類帳不可超過 10 個", "一個公司代碼 ( Company Code )的主要分類帳(leading Ledger )不可超過 3 個", "多個分類帳( General Ledger ) 是 SAP 達到多個平行帳唯一的方法", "一個公司代碼 ( Company Code )的主要分類帳(leading Ledger )只能有1 個"], a: 3, h: "Leading Ledger 在每個公司代碼中只能有一個。"},
+        {q: "SAP ERP 與企業流程能無縫整合，在財會模組 (FI) 是運用那個特性達到這個機制？", o: ["憑證類別 ( Document Type)", "過帳碼 ( Posting Key)", "程式碼 ( Transaction Code)", "會計科目 ( General Ledger )"], a: 0, h: "憑證類別決定了業務流程的分類。"},
+        {q: "公司代碼(company code) 與 成本控制範圍 (controlling area) 的關係是？", o: ["一對多", "多對多", "多對一", "一對一"], a: 2, h: "多個公司代碼可以指派給一個 Controlling Area。"},
+        {q: "在財會模組 (FI) 是運用那個特性來防止使用者用錯了會計科目？", o: ["憑證類別 ( Document Type)", "過帳碼 ( Posting Key)", "程式碼 ( Transaction Code)", "會計科目表 (Chart of Acclount )"], a: 1, h: "Posting Key 限制了可用的科目類型與借貸方。"},
+        {q: "下列何者不是會計科目群組(Account group) 的功能？", o: ["決定該群組會計科目編號區間(number range)", "控制建立會計科目時的欄位狀態(field status)", "依財務報表的目的將會計科目分群", "決定會計科目的借方或貸方"], a: 3, h: "借貸方由過帳碼決定，非科目群組功能。"},
+        {q: "在一張會計憑證中，能顯示多少種幣別的換算結果？", o: ["1", "2", "3", "4"], a: 3, h: "系統最多支援 4 種平行幣別。"},
+        {q: "財務模組(FI)在 交易碼 FB50 所預設過帳鍵(Posting key)是？", o: ["借方：40 貸方：50", "借方：50 貸方：40", "借方：01 貸方：21", "借方：01 貸方：02"], a: 0, h: "總帳 G/L 過帳標準鍵為 40/50。"},
+        {q: "在財務模組(FI)中，那些不可以當成分割憑證的組織架構？", o: ["Segment 段", "Profit Center 利潤中心", "Business Area 業務範圍", "工作中心 Work Center"], a: 3, h: "Work Center 屬於生產模組，不屬於 FI 憑證分割維度。"},
+        {q: "下列那些是管會模組( CO )的子模組？", o: ["應收帳款 (AR)", "應付帳款 (AP)", "利潤中心會計( Profit Center Accounting )", "固定資產管理 (AA)"], a: 2, h: "AR/AP/AA 均屬 FI 模組，PCA 屬 CO 模組。"},
+        {q: "公司代碼( Company Code )與利潤中心( Profit Center )的關係是？", o: ["一對多", "多對多", "多對一", "一對一"], a: 1, h: "根據題庫標註為多對多關係。"},
+        {q: "財會模組 ( FI )與管會模組 ( CO)的憑證在 HANA 版 與 ECC 版的資料表的差別是？", o: ["HANA 版結合在一起", "ECC 版結合在一起", "HANA 版是分離的", "沒有差別"], a: 0, h: "S/4HANA 使用 Universal Journal (ACDOCA) 結合兩者。"},
+        {q: "財會模組 ( FI )與管會模組 ( CO)的會計期間說明何者錯誤？", o: ["會計期間就是指日曆年月", "會計期間起始期間不必一定是 01 月", "會計期間如何設定在年度開始之前就要先決定", "會計期間可以不等於日曆年月"], a: 0, h: "會計期間可自定義（如 4 月到隔年 3 月），不一定等於日曆月。"},
+        {q: "在財會模組 ( FI )中功能範圍 (Function Area)的作用是？", o: ["輔助編制 segment(段) 財務報表", "區分費用的種類", "輔助編製 Company Code( 公司代碼) 財務報表", "輔助編製 Profit Center ( 利潤中心) 財務報表"], a: 1, h: "功能範圍用以區分銷售、製造、研發等費用種類。"},
+        {q: "在管會模組中，下列那些不可以當做成本物件(Cost Object？", o: ["銷售訂單(Sales Order)", "生產工單(Production Order)", "獲利能力區塊(Profitability Segment)", "利潤中心( Profit Center )"], a: 3, h: "利潤中心通常被視為統計性物件，而非直接成本歸屬物件。"},
+        {q: "在管會模組(co)的子模組之中，那些是在管理製造費用？ 1 成本中心會計 Cost Center Accounting 2 內部訂單會計 Internal Orders 3 產品成本控制 Product Cost Controlling 4 利潤中心會計 Profitability Analysis 5 獲利分析會計 Profit Center Accounting", o: ["1,2", "2,3", "3,4", "1,4"], a: 0, h: "成本中心與內部訂單用於管理間接/製造費用。"},
+        {q: "在管會模組(CO)中，內部訂單會計 Internal Orders有很多的功能？但不包含那一項？", o: ["當做間接費用訂單", "當做投資訂單", "當做收入訂單", "當做存貨訂單"], a: 3, h: "內部訂單不包含存貨訂單功能。"},
+        {q: "在 管會模組( CO) 之中，內部訂單(Internal Orders)的類型包含 下列那些功能： (1) 間接成本訂單(Overhead Cost Orders) (2) 投資訂單(Investment Orders) (3) 應計訂單(Accrual Orders) (4) 帶有收益的訂單(Orders with Revenues)", o: ["1,2,3", "1,2,4", "1,2,3,4", "1,3,4"], a: 2, h: "內部訂單涵蓋以上四種主要類型。"},
+        {q: "獲利能力區塊(Profitability Segment)由多個組成元件，下列何時為非？", o: ["特性(Characteristics)", "特性值(Characteristic Value)", "值欄位(Value Field)", "時間( Time )"], a: 3, h: "時間並非 CO-PA 的核心定義元件。"},
+        {q: "特性(Characteristics)是獲利能力分析(Profitability Analysis)中相當重要的概念，但不會包含那一種特性？", o: ["客戶", "產品", "銷售組織(Sales Organization)", "品檢結果"], a: 3, h: "品檢結果不屬於 CO-PA 的獲利分析特性。"},
+        {q: "成本中心(Cost Center)主檔資料的相關設定包含多項，但不包含何者", o: ["基本資料(Basic Data)，輸入成本中心的名稱與描述、負責人、所屬部門", "成本中心類型(Cost Center Type)，定義成本中心的用途，例如生產、行銷等", "層級範圍(Hierarchy Area)，將成本中心指派至特定標準層級節點之下", "成本中心可執行那些作業類型"], a: 3, h: "作業類型的執行權限通常在分配規則或主檔其他頁籤設定。"},
+        {q: "何謂作業類型(Activity Type)，下列說明何者錯誤？", o: ["作業類型是用來將成本中心提供的作業活動進行分類", "在進行內部作業分配(Internal Activity Allocation)的過程中，作業量可以手動輸入，也可由系統依據相關設定計算而得", "作業類型可作為分配成本時的追蹤因子(Tracing Factor)", "決定作業類型單價的是工廠 Plant"], a: 3, h: "單價通常由成本中心預算與作業量決定，而非工廠。"},
+        {q: "價格指示碼(Price Indicator)的作用是", o: ["區別出計劃的與實際的作業類型(Activity Type)價格", "決定作業類型價格的計算方式", "決定作業類型的用途", "決定作業類型的使用優先次序"], a: 1, h: "Price Indicator 決定系統如何計算單價（計畫或實際）。"},
+        {q: "建立會計科目時( General Ledger ) ，可選擇的類別有許多，但不包含那一項？", o: ["Secondary Cost Element 次要成本要素", "Primary Cost Element 主要成本要素", "Balance Sheet Account 資產負債表科目", "成本與費用類別"], a: 3, h: "S/4HANA 的 G/L 類別包含前三項，但不包含獨立的「成本與費用類別」。"},
+        {q: "在管會模組(CO)中，成本中心如何計算資源的耗用？", o: ["內部訂單 Internal Order", "結算規則 Settlement Rule", "作業類型 Activity Type", "統計關鍵數字 Statistical Key figure"], a: 2, h: "Activity Type 用於量化並分配成本中心的資源耗用。"},
+        {q: "在財會模組(CO)中，統制帳戶( Reconciliation Account )如應收帳款，能不能在傳票登錄中(FB50)，直接使用？", o: ["不能，必須用對應的主數據如客戶編號替代", "可以, 而且必須用應收帳款科目記帳", "由會計人員自行選擇用應收帳款科目或客戶編號計帳。", "依顧問的配置而定。"], a: 0, h: "統制帳戶不允許直接手動過帳。"},
+        {q: "在建立廠商資料時，選擇了 FI VENDOR (廠商的公司代碼角色)時，它是它是如何與資產負債表中的應付帳款產生連結的？", o: ["統制帳戶科目 ( Reconciliation Account)", "付款條件 ( Payment Term)", "貿易條件 (Incoterms)", "付款方式 ( Payment Method)"], a: 0, h: "透過 Vendor 主檔中的統制帳戶進行連結。"},
+        {q: "在財會模組(FI)中，建立傳票時( FB50 ) 如果在檔身會計科目是屬於費用科目( Expense )時，下列那個欄位是必填的？", o: ["稅碼 (Tax Code)", "公司代碼(Company Code)", "幣別( Currency )", "成本物件( cost object, Controlling object)"], a: 3, h: "費用科目過帳時必須指派一個 CO 成本物件（如成本中心）。"},
+        {q: "在管會模組( CO )中，利潤中心 ( Profit Center )，可以掛在那些那些物件( object )中。 1 物料 Material 2 固定資產 asset 3 專案 project 4 成本中心 cost center", o: ["1,2,4", "2,3,4", "1,3,4", "1,2,3"], a: 1, h: "利潤中心可指派給資產、專案與成本中心。"},
+        {q: "在管會模組( CO )中，成本中心( Cost center ) 之間的分攤基礎是利用那一種物件( object ) 來完成？例如要依部門人數來分攤分配餐廳成本。", o: ["內部訂單 Internal Order", "結算規則 Settlement Rule", "作業類型 Activity Type", "統計關鍵數字 Statistical Key figure"], a: 3, h: "部門人數等數值指標稱為「統計關鍵數字」。"},
+        {q: "在管會模組( CO )中，組織架構( Sale Org.)的最高階層是？", o: ["成本控制範圍 ( Controlling area)", "利潤中心 ( Profit Center )", "公司 (Company )", "營運考量 ( Operation Concern)"], a: 3, h: "Operating Concern 是 CO-PA 的最高階組織單位。"},
+        {q: "管會模組( CO )與何模組關聯性最強？", o: ["品檢模組 QM", "財會模組 FI", "維修模組 EAM", "客戶服務模組 CS"], a: 1, h: "FI 與 CO 是財務系統的核心雙生模組。"},
+        {q: "管會模組( CO )中有關主要成本要素與次要成本要素的說明些錯誤？", o: ["主要成本要素 Primary Cost 會對應到會計科目 General Ledger", "會計科目 General Ledger 一定要對應到主要成本要素 Primary Cost", "次要成本要素 Secondary Cost 不會對應到會計科目 General Ledger", "大多數的費用類會計科目 General Ledger 會對應到主要成本要素 Primary Cost"], a: 1, h: "資產負債表科目不需對應到主要成本要素。"},
+        {q: "下列何者非財務會計模組的內部受眾者", o: ["執行長", "高階主管", "財務分析師", "行政管理人員"], a: 2, h: "財務分析師通常被視為外部或專業分析角色。"},
+        {q: "關於公司群組 (Company Group) 、公司 (Company) 、公司代碼 (Company Code) 描述何者為非", o: ["公司群組和公司可以是1對多關係", "公司群組和公司可以是多對多關係", "公司和公司代碼可以是1對多關係", "公司和公司代碼不可以混用"], a: 1, h: "公司群組與公司架構並非多對多關係。"},
+        {q: "在財務會計模組中，用來授權和監控客戶的信用額度", o: ["客戶主數據", "訂單", "銷售區域", "信用管制範圍"], a: 3, h: "Credit Control Area 用於管理客戶額度。"},
+        {q: "在財務會計模組中，由一組總賬科目組成的分類方案", o: ["總帳", "科目表", "利潤中心", "成本中心"], a: 1, h: "Chart of Accounts 定義了科目結構。"},
+        {q: "關於分類帳方法 (Ledger approach) 的描述何者為非", o: ["不會有未分配的科目", "多套平行帳亦不亂", "定義標準財務報表", "所有價值方法過帳到成本控製模組"], a: 3, h: "並非所有價值方法都會過帳到 CO。"},
+        {q: "關於會計帳方法 (Account approach) 的描述何者為非", o: ["容易實現", "標準功能可滿足", "定義標準財務報表困難", "會計科目變很多"], a: 2, h: "會計帳方法依然可定義標準報表。"},
+        {q: "何者為從財務會計模組轉入至成本控制模組成為主要成本要素", o: ["費用科目", "非營業成本", "存貨", "短期資本"], a: 0, h: "費用科目對應主要成本要素。"},
+        {q: "關於應付帳款明細帳描述何者為非", o: ["關係到企業購買供應商商品和服務的資訊", "與銷售活動和收款相關", "在物料管理模組 (MM) 中的帳單將生成 為財務會計模組 (FI) 的日記帳分錄", "物料管理模組 (MM) 與財務會計模組 (FI) 之間的實質性和重要整合"], a: 1, h: "銷售活動與應「收」帳款有關。"},
+        {q: "關於統制帳戶的代碼描述何者為非", o: ["A: 資產", "D: 顧客", "V: 供應商", "M: 物料"], a: 2, h: "供應商統制帳戶代碼通常使用 K (Creditor)。"},
+        {q: "關於傳票日期描述何者為非", o: ["文件日期 (Document date) 是文件建立的日期", "過帳日期 (Posting date) 是決定會計期間", "轉換日期 (Translation date) 是指外幣過帳的的匯率交換日期", "鍵入日期 (Entry date) 是指過帳文件的輸入時間"], a: 0, h: "文件日期通常是發票日期，系統建立日期是 Entry Date。"},
+        {q: "哪個非借方會計科目", o: ["辦公用品耗用", "客戶發票", "總帳借方過帳", "客戶貸項通知"], a: 3, h: "客戶貸項通知是沖減應收，屬貸方。"},
+        {q: "哪個非貸方會計科目", o: ["客戶貸項通知", "客戶發票", "供應商發票", "總帳貸方過帳"], a: 1, h: "客戶發票對應應收帳款借方。"},
+        {q: "何者為資產類的會計科目", o: ["應收帳款", "應付帳款", "稅賦", "普通股"], a: 0, h: "應收帳款為流動資產。"},
+        {q: "何者為負債類的會計科目", o: ["現金", "設備", "短期借款", "保留盈餘"], a: 2, h: "借款為負債。"},
+        {q: "哪個報表在給定時間段內呈現組織的收入和支出 (例如每月、每季度或每年)", o: ["資產負債表", "損益表", "業主權益變動表", "股東權益變動表"], a: 1, h: "損益表 (P&L) 顯示收入與費用。"},
+        {q: "何者為收入類的會計科目", o: ["銷貨收入", "營業費用", "所得稅", "銷貨成本"], a: 0, h: "銷貨收入為主要收入科目。"},
+        {q: "何者為費用類的會計科目", o: ["銷售成本", "銷售折讓", "營業利益", "營業外收入"], a: 0, h: "銷售成本 (COGS) 為費用項。"},
+        {q: "哪個報表在給定時間段內 (例如每月、每季度或每年) 呈現現金流入與流出的變化", o: ["資產負債表", "損益表", "現金流量表", "盈餘分配表"], a: 2, h: "現金流量表紀錄金流異動。"},
+        {q: "財務會計模組與哪個模組無關", o: ["銷售與配送模組 (SD)", "物料管理模組 (MM)", "生產管理模組 (PP)", "品質管理模組 (QM)"], a: 3, h: "根據題庫，FI 與 QM 整合關係較弱。"},
+        {q: "何者不是成本控制模組的範圍", o: ["成本要素會計 (Cost Element Accounting)", "內部訂單 (Intenal Orders)", "作業成本制 (Activity-Based Costing)", "平衡計分卡(Balanced Scorecard)"], a: 3, h: "BSC 通常屬於策略管理模組。"},
+        {q: "下列何者非成本控制模組的受眾者", o: ["執行長", "股東", "成本控管人員", "成本會計師"], a: 1, h: "股東看的是外部財務報表 (FI)。"},
+        {q: "在成本控制模組中，何者不適合計入內部訂單", o: ["公司野餐", "辦理展覽", "招聘活動", "客戶訂單"], a: 3, h: "客戶訂單由 SD 管理。"},
+        {q: "在成本控制模組中，何者不屬於內部訂單", o: ["客戶訂單", "投資訂單", "應計訂單", "間接成本訂單"], a: 0, h: "客戶訂單非內部訂單類型。"},
+        {q: "請選出正確的產品成本控制 (Product Costing) 流程 (1) 建立成本估算 (2) 發佈價格更新 (3) 標記價格變更 (4) 建立物料標準價格", o: ["1,2,3,4", "4,1,3,2", "4,1,2,3", "1,3,2,4"], a: 1, h: "估算 -> 標記 -> 發佈 (1->3->2)。"},
+        {q: "關於利潤中心 (Profit Center) 和獲利分析 (Profitability Analysis) 的描述何者為非", o: ["利潤中心可以包括成本中心和利潤中心", "成本中心的地位應該高於利潤中心", "獲利分析可以按照地區別、客戶別和業務人員進行分析", "公司底下可以包括利潤中心和獲利分析"], a: 0, h: "利潤中心結構通常與成本中心並列或層級不同。"},
+        {q: "當組織進行獲利分析時，何者不屬於特性欄位", o: ["客戶", "銷售組織", "物料", "商品數量"], a: 3, h: "商品數量屬於值欄位 (Value Field)。"},
+        {q: "當組織進行獲利分析時，何者不屬於值欄位", o: ["物料", "銷售折扣", "商品數量", "商品成本"], a: 0, h: "物料屬於特性欄位。"},
+        {q: "在建立成本中心時，無須進行下列何者步驟", o: ["建立成本要素", "建立作業類型", "建立統計關鍵數據", "建立利潤中心"], a: 3, h: "建立成本中心不需先建立利潤中心。"},
+        {q: "在成本控制模組中，何者不是成本中心會計的主數據", o: ["物料主數據", "收入要素", "成本要素", "統計關鍵數字"], a: 0, h: "物料主數據屬 MM。"},
+        {q: "在成本控制模組中，用來授權和監控客戶的信用額度", o: ["客戶主數據", "信用管制範圍", "銷售區域", "訂單"], a: 1, h: "Credit Control Area 管理信用額度。"},
+        {q: "在成本控制模組中，以統一方式構建銷售市場，可以計算各個細分市場的營業利潤", o: ["用戶端", "公司代碼", "營運考量", "控制範圍"], a: 2, h: "Operating Concern (營運考量) 用於獲利分析。"},
+        {q: "在成本控制模組中，只負責成本控制，但不包括組織產生的收入", o: ["主要成本要素", "次要成本要素", "利潤中心", "成本中心"], a: 3, h: "成本中心僅歸集成本。"},
+        {q: "何者不是主要成本要素", o: ["物料成本", "租金費用", "員工成本", "能源成本"], a: 1, h: "租金費用在 CO 中可能由 FI 轉入。"},
+        {q: "關於成本要素的描述何者為非", o: ["財務會計模組的費用科目和成本控制模組的成本要素相對應", "財務會計模組的收入科目和成本控制模組的收入要素相對應", "主要成本要素和次要成本要素是源自於損益表", "損益表包括總帳費用科目和收入科目"], a: 2, h: "次要成本要素僅在 CO 內部使用。"},
+        {q: "何者可作為統計關鍵數字 (Statistical Key Figures)", o: ["員工人數", "平方英尺", "電腦使用時間", "以上皆是"], a: 3, h: "三者均為分配成本的比例依據。"},
+        {q: "成本控制模組與哪個模組無關", o: ["銷售與配銷模組 (SD)", "物料管理模組 (MM)", "品質管理模組 (QM)", "財務會計模組 (FI)"], a: 2, h: "根據題庫設定 CO 與 QM 關聯較弱。"},
+        {q: "何者是成本控制模組中的主數據", o: ["營運考量", "成本控制範圍", "銷售組織", "成本中心"], a: 3, h: "成本中心是 CO 的核心主數據。"},
+        {q: "關於成本分派 (Allocation) 描述何者正確", o: ["進行成本分派時，可以將某一成本中心 (Cost Center) 一次性分派給成本中心群組 (Group)", "當組織將租金費用科目分配到其他部門的租金費用科目，適用於分攤 (Assessment) 方法", "當組織將租金費用、人事費用、營運中心打包在一起，再分配給其他部份，適用於分配 (Distribution) 方法", "分配 (Distribution) 是指定期分配主要成本要素和次要成本要素的方法"], a: 0, h: "分配(Distribution) 僅能分配主要成本要素。"},
+
+        // 新增共同科目題庫 (24題)
+        {q: "在SAP S/4HANA平台中，針對內部部署(On-Premise)的描述那些是正確的？ 1 SAP 提供系統維運(SAP provides system and controls maintenance) 2 用戶自行管理資料(Privately controlled data) 3 每季自動版本更新(Automatic quarterly innovation upgrades) 4 較少的更新周期(Fewer release cycles)", o: ["23", "24", "12", "14"], a: 1, h: "On-Premise 由用戶控管且更新週期較長。"},
+        {q: "在SAP ERP的版本演化，若依時序排列，應該是？ 1 R/2 2 ERP ECC 3 S/4HANA 4 R/3", o: ["1423", "4123", "4321", "1234"], a: 0, h: "順序為 R/2 -> R/3 -> ECC -> S/4HANA。"},
+        {q: "在SAP ERP的操作中，若忘記供應商建檔( Create a Vendor)的功能表位置 ，可利用那個 T-CODE找出來？", o: ["SAP_SEARCH_MENU", "SEARCH_MENU_SAP", "SEARCH_SAP_MENU", "SAP_MENU_SEARCH"], a: 2, h: "SEARCH_SAP_MENU 可搜尋選單位置。"},
+        {q: "在SAP S/4HANA 開發應用程式，必須具備何種關鍵IT設備？", o: ["大量的記憶體(Large memory)", "移動裝置(Mobile devices)", "快速的硬碟(Fast harddisk)", "快速的無線網路(Fast wireless network)"], a: 0, h: "S/4HANA 基於記憶體運算。"},
+        {q: "在SAP ERP的資料型態中(Data Types)，何者不屬於主數據(Master Data)？", o: ["工作中心(Work Center)", "固定資產(Asset)", "會計科目(General Ledger accounts)", "產品別(Division)"], a: 3, h: "Division 屬於組織數據。"},
+        {q: "在SAP ERP的資料型態中(Data Types)，銷售通路(Distribution Channel)屬於那一種？", o: ["組織架構(Organizational Data)", "主數據(Master Data)", "交易數據(Transaction Data)", "計畫訂單(Planned Order)"], a: 0, h: "銷售通路是組織架構的一部分。"},
+        {q: "在SAP ERP的資料型態中(Data Types)，報價單(Quotation)屬於那一種？", o: ["組織架構(Organizational Data)", "主數據(Master Data)", "交易數據(Transaction Data)", "計畫訂單(Planned Order)"], a: 2, h: "報價單產生的紀錄屬於交易數據。"},
+        {q: "在SAP ERP的操作畫面，各種語言介面，若要選擇繁體中文，應該選擇？", o: ["TW", "ZF", "ZH", "CN"], a: 1, h: "ZF 為 SAP 系統中繁體中文的代碼。"},
+        {q: "SAP S/4HANA版本，能與許多雲端應用程式無縫整合，但不包含下那一項？", o: ["SAP Ariba", "SAP Concur", "Linkedln", "SAP Fieldglass"], a: 2, h: "LinkedIn 非 SAP 核心整合雲端套件。"},
+        {q: "在SAP S/4HANA平台中，提供許多的模組，其中與人資相關的模組是？", o: ["HCM", "EAM", "CS", "PS"], a: 0, h: "HCM 代表 Human Capital Management。"},
+        {q: "SAP S/4HANA版本，能與許多雲端應用程式無縫整合，但不包含下那一項？", o: ["NetSuite", "SAP Ariba", "SAP Concur", "SAP Hybris"], a: 0, h: "NetSuite 是 Oracle 的產品。"},
+        {q: "為何在SAP S/4HANA版本，許多應用程式(application code)必須重寫(re-written)？", o: ["因為由ABAP代碼無法在 S/4HANA平台使用", "因為要讓確保在S/4HANA的效能得以發揮", "因為S/4HANA只能用JAVA開發", "因為S/4HANA架構比較複雜"], a: 1, h: "為了發揮 HANA 記憶體資料庫的效能。"},
+        {q: "何者不是組織數據 (Organizational Data)", o: ["公司代碼", "銷售組織", "銷售通路", "訂單"], a: 3, h: "訂單屬於交易數據。"},
+        {q: "請由上到下排列出組織架構 (1) 公司代碼 (Company code) (2) 用戶端 (Client) (3) 產品別 (Division) (4) 銷售通路 (Distribution channel) (5) 銷售組織 (Sales organization)", o: ["1,2,4,5,3", "1,2,5,4,3", "2,1,4,5,3", "2,1,5,4,3"], a: 3, h: "最高層級為 Client，接著是 Company Code。"},
+        {q: "SAP S/4 HANA的雲端產品中，何者主要是用來提供與銷售市場相關的整合解決方案", o: ["ARIBA", "FIELDGLASS", "CONCUR", "HYBRIS"], a: 3, h: "Hybris (SAP Commerce Cloud) 負責銷售市場整合。"},
+        {q: "何者不是SAP S/4 HANA本地端(On-Premise)的特性", o: ["自行佈署控管和維護", "較少更新頻率", "主機硬體建置在公司外部", "能私自控制數據"], a: 2, h: "On-Premise 通常建置在公司內部。"},
+        {q: "針對SAP S/4 HANA的描述何者為非", o: ["採用第三正規化", "單一數據來源", "無須儲存冗餘的資料", "資料匯集和分析處理速度加快"], a: 0, h: "HANA 使用簡化的扁平化結構，非傳統第三正規化。"},
+        {q: "在SAP FIORI介面中，何者是通過導覽方式去存取任務，如：創建、修改或展式流程等", o: ["交易類Apps", "應用類Apps", "報表類Apps", "系統類Apps"], a: 0, h: "Transactional Apps 用於處理交易任務。"},
+        {q: "在Logistics下查詢不到哪個模組", o: ["SD模組", "MM模組", "PP模組", "FI模組"], a: 3, h: "FI 屬於 Financials 部門，非 Logistics。"},
+        {q: "關於T-Code的使用描述何者為非", o: ["/O加上某T-Code可以直接開啟該視窗功能", "/N加上某T-Code會先關閉原視窗後再開啟", "/NEX為強制退出系統", "在某視窗功能開啟的狀態下，可以直接輸入T-Code"], a: 3, h: "已在功能內時，輸入 T-Code 需加 /N 或 /O。"},
+        {q: "何者無法在SAP GUI Options上設定", o: ["設定字體大小", "設定字型", "設定小數點格式", "設定下拉式選單的排序"], a: 2, h: "小數點格式通常在使用者個人設定(SU3)中修改。"},
+        {q: "何者為買賣業主要的物料分類方式", o: ["貿易品", "原物料", "半成品", "成品"], a: 0, h: "買賣業主要處理 Trading Goods (HAWA)。"},
+        {q: "何者為SAP組織架構中的最高層級，通常整個組織只會有一個", o: ["用戶端 (Client)", "公司代碼 (Company code)", "公司群組 (Company Group)", "營運考量 (Operating Concern)"], a: 0, h: "Client 是 SAP 系統層級的最高單位。"},
+        {q: "在SAP組織架構中，何者為用來負責銷售某些產品或服務的組織單位", o: ["銷售組織 (Sales organization)", "銷售通路 (Sales channel)", "產品別 (Division)", "銷售區域 (Sales area)"], a: 0, h: "銷售組織是負責銷售法律義務的單位。"}
+    ];
+
+    let quizData = [];
+    let currentIdx = 0;
+    let userAnswers = [];
+    let correctCount = 0;
+
+    function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+
+    function startQuiz(num) {
+        const pool = [...allQuestions];
+        shuffle(pool);
+        quizData = pool.slice(0, num);
+        
+        document.getElementById('setupView').classList.add('hidden');
+        document.getElementById('quizView').classList.remove('hidden');
+        document.getElementById('quizTitle').textContent = `模擬測驗 (總計 ${num} 題模式)`;
+        
+        currentIdx = 0;
+        userAnswers = new Array(quizData.length).fill(null);
+        correctCount = 0;
+        showQuestion();
+    }
+
+    function showQuestion() {
+        const q = quizData[currentIdx];
+        document.getElementById('progressText').textContent = `第 ${currentIdx + 1} 題 / 共 ${quizData.length} 題`;
+        document.getElementById('progressBar').style.width = `${((currentIdx + 1) / quizData.length) * 100}%`;
+        document.getElementById('questionText').textContent = q.q;
+        document.getElementById('hintContent').textContent = q.h;
+        document.getElementById('hintBox').classList.add('hidden');
+
+        const container = document.getElementById('optionsContainer');
+        container.innerHTML = '';
+        const labels = ['A', 'B', 'C', 'D'];
+
+        q.o.forEach((opt, i) => {
+            const div = document.createElement('div');
+            div.className = 'option';
+            if (userAnswers[currentIdx] !== null) {
+                div.classList.add('disabled');
+                if (i === q.a) div.classList.add('correct');
+                if (i === userAnswers[currentIdx] && i !== q.a) div.classList.add('wrong');
+            } else {
+                div.onclick = function() { selectOption(i); };
+            }
+            div.innerHTML = `<span class="option-label">${labels[i]}.</span> ${opt}`;
+            container.appendChild(div);
+        });
+
+        document.getElementById('nextBtn').textContent = (currentIdx === quizData.length - 1) ? '查看結果' : '下一題';
+    }
+
+    function selectOption(i) {
+        if (userAnswers[currentIdx] !== null) return;
+        userAnswers[currentIdx] = i;
+        if (i === quizData[currentIdx].a) correctCount++;
+        showQuestion();
+    }
+
+    function toggleHint() {
+        document.getElementById('hintBox').classList.toggle('hidden');
+    }
+
+    function handleNext() {
+        if (userAnswers[currentIdx] === null) {
+            alert('請選擇一個答案！');
+            return;
+        }
+        if (currentIdx < quizData.length - 1) {
+            currentIdx++;
+            showQuestion();
+        } else {
+            showResult();
+        }
+    }
+
+    function showResult() {
+        document.getElementById('quizView').classList.add('hidden');
+        document.getElementById('resultView').classList.remove('hidden');
+        
+        const score = Math.round((correctCount / quizData.length) * 100);
+        document.getElementById('finalScore').textContent = `${score}%`;
+        document.getElementById('resultDetail').textContent = `共 ${quizData.length} 題，答對 ${correctCount} 題。`;
+
+        const wrongItemsContainer = document.getElementById('wrongItemsContainer');
+        wrongItemsContainer.innerHTML = '';
+        const labels = ['A', 'B', 'C', 'D'];
+        let hasWrong = false;
+
+        quizData.forEach((q, index) => {
+            if (userAnswers[index] !== q.a) {
+                hasWrong = true;
+                const item = document.createElement('div');
+                item.className = 'wrong-item';
+                item.innerHTML = `
+                    <span class="wrong-q">【第${index + 1}題】 ${q.q}</span>
+                    <div class="answer-diff">
+                        <span class="your-ans">❌ 你的答案：${labels[userAnswers[index]] || '未作答'}</span>
+                        <span class="correct-ans">✅ 正確答案：${labels[q.a]}</span>
+                    </div>
+                    <div class="wrong-hint"><strong>解析：</strong>${q.h}</div>
+                `;
+                wrongItemsContainer.appendChild(item);
+            }
+        });
+
+        if (!hasWrong) {
+            wrongItemsContainer.innerHTML = '<p style="color: #22c55e; font-weight: bold; text-align: center;">太棒了！滿分過關 🎊</p>';
+        }
+    }
+</script>
+
+</body>
+</html>
