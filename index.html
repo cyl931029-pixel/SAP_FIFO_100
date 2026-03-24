@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -297,8 +297,8 @@
                 item.innerHTML = `
                     <span class="wrong-q">【第${index + 1}題】 ${q.q}</span>
                     <div class="answer-diff">
-                        <span class="your-ans">❌ 你的答案：${labels[userAnswers[index]] || '未作答'}</span>
-                        <span class="correct-ans">✅ 正確答案：${labels[q.a]}</span>
+                        <span class="your-ans">❌ 你的答案：${userAnswers[index] !== null ? labels[userAnswers[index]] + '. ' + q.o[userAnswers[index]] : '未作答'}</span>
+                        <span class="correct-ans">✅ 正確答案：${labels[q.a]}. ${q.o[q.a]}</span>
                     </div>
                     <div class="wrong-hint"><strong>解析：</strong>${q.h}</div>
                 `;
