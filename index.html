@@ -209,9 +209,17 @@
     }
 
     function startQuiz(num) {
-        const pool = [...allQuestions];
+        // 使用 JSON 深拷貝，避免重新測驗時改到原始題庫
+        const pool = JSON.parse(JSON.stringify(allQuestions));
         shuffle(pool);
         quizData = pool.slice(0, num);
+        
+        // 將每一題的「選項」打亂，並重新計算正確答案 (q.a) 的新索引位置
+        quizData.forEach(q => {
+            const correctAnswerText = q.o[q.a];
+            shuffle(q.o);
+            q.a = q.o.indexOf(correctAnswerText);
+        });
         
         document.getElementById('setupView').classList.add('hidden');
         document.getElementById('quizView').classList.remove('hidden');
